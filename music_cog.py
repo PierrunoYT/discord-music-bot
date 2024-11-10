@@ -56,6 +56,8 @@ class MusicCog(commands.Cog):
         self.current_player = None
         self.song_queue = []
         self.volume = 0.5  # Default volume (50%)
+        self.loop_mode = "off"  # off, track, queue
+        self.current_ctx = None  # Store context for looping
 
     async def get_spotify_track_url(self, spotify_url):
         """Convert Spotify URL to YouTube search query"""
@@ -110,6 +112,7 @@ class MusicCog(commands.Cog):
                     player.volume = self.volume
                     ctx.voice_client.play(player, after=lambda e: self.play_next(ctx))
                     self.current_player = player
+                    self.current_ctx = ctx
                     await ctx.send(f'Now playing: {player.title}')
                 
             except Exception as e:
@@ -146,15 +149,30 @@ class MusicCog(commands.Cog):
 
     def play_next(self, ctx):
         """Play the next song in the queue"""
-        if self.song_queue:
+        if self.loop_mode == "track" and self.current_player:
+            # Replay the current track
+            player = self.current_player
+            ctx = self.current_ctx
+            player.volume = self.volume
+            ctx.voice_client.play(player, after=lambda e: self.play_next(ctx))
+            asyncio.run_coroutine_threadsafe(
+                ctx.send(f'Looping track: {player.title}'),
+                self.bot.loop
+            )
+        elif self.song_queue:
             next_player, next_ctx = self.song_queue.pop(0)
             next_player.volume = self.volume
             next_ctx.voice_client.play(next_player, after=lambda e: self.play_next(next_ctx))
             self.current_player = next_player
+            self.current_ctx = next_ctx
             asyncio.run_coroutine_threadsafe(
                 next_ctx.send(f'Now playing: {next_player.title}'),
                 self.bot.loop
             )
+            
+            # If queue loop is enabled, add the song back to the end
+            if self.loop_mode == "queue":
+                self.song_queue.append((self.current_player, self.current_ctx))
 
     @commands.command(name='skip')
     async def skip(self, ctx):
@@ -172,6 +190,22 @@ class MusicCog(commands.Cog):
     @commands.command(name='volume')
     async def volume(self, ctx, volume: int):
         """Change the player volume (0-100)"""
+
+    @commands.command(name='loop')
+    async def loop(self, ctx, mode: str = None):
+        """Set loop mode (off/track/queue)"""
+        valid_modes = ['off', 'track', 'queue']
+        
+        # If no mode specified, cycle through modes
+        if mode is None:
+            current_index = valid_modes.index(self.loop_mode)
+            self.loop_mode = valid_modes[(current_index + 1) % len(valid_modes)]
+        elif mode.lower() in valid_modes:
+            self.loop_mode = mode.lower()
+        else:
+            return await ctx.send("Invalid loop mode. Use: off, track, or queue")
+            
+        await ctx.send(f"Loop mode set to: {self.loop_mode}")
         if not ctx.voice_client:
             return await ctx.send("Not connected to a voice channel.")
             

@@ -47,6 +47,7 @@ cp .env.example .env
 - `!skip` - Skip to the next song in queue
 - `!queue` - Display the current queue
 - `!volume <0-100>` - Adjust the playback volume
+- `!loop [mode]` - Set loop mode (off/track/queue). No argument cycles through modes
 
 ## Setting Up Development Environment
 
