@@ -190,6 +190,18 @@ class MusicCog(commands.Cog):
     @commands.command(name='volume')
     async def volume(self, ctx, volume: int):
         """Change the player volume (0-100)"""
+        if not ctx.voice_client:
+            return await ctx.send("Not connected to a voice channel.")
+            
+        if not 0 <= volume <= 100:
+            return await ctx.send("Volume must be between 0 and 100")
+            
+        self.volume = volume / 100  # Convert to float between 0 and 1
+        
+        if ctx.voice_client.source:
+            ctx.voice_client.source.volume = self.volume
+            
+        await ctx.send(f"Volume set to {volume}%")
 
     @commands.command(name='loop')
     async def loop(self, ctx, mode: str = None):
@@ -206,18 +218,6 @@ class MusicCog(commands.Cog):
             return await ctx.send("Invalid loop mode. Use: off, track, or queue")
             
         await ctx.send(f"Loop mode set to: {self.loop_mode}")
-        if not ctx.voice_client:
-            return await ctx.send("Not connected to a voice channel.")
-            
-        if not 0 <= volume <= 100:
-            return await ctx.send("Volume must be between 0 and 100")
-            
-        self.volume = volume / 100  # Convert to float between 0 and 1
-        
-        if ctx.voice_client.source:
-            ctx.voice_client.source.volume = self.volume
-            
-        await ctx.send(f"Volume set to {volume}%")
         if not self.current_player and not self.song_queue:
             await ctx.send("The queue is empty")
             return
