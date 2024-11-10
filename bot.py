@@ -1,11 +1,12 @@
 import os
+from dotenv import load_dotenv
+
+# Load environment variables before any other imports that might use them
+load_dotenv()
+
 import discord
 from discord.ext import commands
-from dotenv import load_dotenv
 from music_cog import MusicCog
-
-# Load environment variables
-load_dotenv()
 
 # Bot setup with required intents
 intents = discord.Intents.default()

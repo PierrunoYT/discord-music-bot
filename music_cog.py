@@ -8,10 +8,10 @@ from pathlib import Path
 from queue_manager import QueueManager, QueuedSong
 from discord.ext import commands
 from spotipy.oauth2 import SpotifyClientCredentials
-import youtube_dl
+import yt_dlp
 import os
 
-# YouTube DL options
+# YT-DLP options
 ytdl_format_options = {
     'format': 'bestaudio/best',
     'restrictfilenames': True,
@@ -28,7 +28,11 @@ ytdl_format_options = {
     'preferredquality': '192',
     # Enable fast start
     'buffersize': 32768,
-    'audio_buffer_size': 50000
+    'audio_buffer_size': 50000,
+    # Use yt-dlp specific options
+    'extract_flat': True,
+    'extractor_retries': 3,
+    'http_chunk_size': 10485760,
 }
 
 ffmpeg_options = {
@@ -36,7 +40,7 @@ ffmpeg_options = {
     'options': '-vn -af "volume=0.5" -loglevel error -bufsize 32k -maxrate 160k'
 }
 
-ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
+ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
 # Initialize Spotify client
 spotify = spotipy.Spotify(auth_manager=SpotifyClientCredentials(
@@ -136,7 +140,7 @@ class MusicCog(commands.Cog):
 
         # Add first song to play immediately if nothing is playing
         first_entry = entries[0]
-        first_player = await YTDLSource.from_url(first_entry['webpage_url'], loop=self.bot.loop, stream=True)
+        first_player = await YTDLSource.from_url(first_entry['url'], loop=self.bot.loop, stream=True)
         
         if ctx.voice_client.is_playing():
             self.song_queue.append((first_player, ctx))
@@ -151,7 +155,7 @@ class MusicCog(commands.Cog):
         # Queue remaining songs
         for entry in entries[1:]:
             try:
-                player = await YTDLSource.from_url(entry['webpage_url'], loop=self.bot.loop, stream=True)
+                player = await YTDLSource.from_url(entry['url'], loop=self.bot.loop, stream=True)
                 self.song_queue.append((player, ctx))
             except Exception as e:
                 print(f"Error processing playlist item: {e}")
@@ -188,13 +192,17 @@ class MusicCog(commands.Cog):
     async def get_spotify_track_url(self, spotify_url):
         """Convert Spotify URL to YouTube search query"""
         try:
-            track = spotify.track(spotify_url)
+            # Extract track ID from URL
+            track_id = spotify_url.split('/')[-1].split('?')[0]
+            track = spotify.track(track_id)
             search_query = f"{track['artists'][0]['name']} - {track['name']}"
             data = await self.bot.loop.run_in_executor(
                 None, 
                 lambda: ytdl.extract_info(f"ytsearch:{search_query}", download=False)
             )
-            return data['entries'][0]['webpage_url']
+            if not data.get('entries'):
+                raise Exception("No YouTube results found for this track")
+            return data['entries'][0]['url']
         except Exception as e:
             raise Exception(f"Error processing Spotify link: {str(e)}")
 
@@ -235,7 +243,7 @@ class MusicCog(commands.Cog):
                                     )
                                     if data.get('entries'):
                                         player = await YTDLSource.from_url(
-                                            data['entries'][0]['webpage_url'],
+                                            data['entries'][0]['url'],
                                             loop=self.bot.loop,
                                             stream=True
                                         )
@@ -274,7 +282,7 @@ class MusicCog(commands.Cog):
                         if not data.get('entries'):
                             await ctx.send("No results found.")
                             return
-                        query = data['entries'][0]['webpage_url']
+                        query = data['entries'][0]['url']
                     
                     # Get the player for single track
                     player = await YTDLSource.from_url(query, loop=self.bot.loop, stream=True)
@@ -417,6 +425,22 @@ class MusicCog(commands.Cog):
     @commands.command(name='queue')
     async def queue(self, ctx):
         """Display the current song queue"""
+        if not self.current_player and not self.song_queue:
+            await ctx.send("The queue is empty")
+            return
+
+        queue_msg = []
+        if self.current_player:
+            queue_msg.append(f"Currently playing: {self.current_player.title}")
+        
+        if self.song_queue:
+            queue_msg.append("\nUp next:")
+            for i, (player, _) in enumerate(self.song_queue, 1):
+                queue_msg.append(f"{i}. {player.title}")
+        else:
+            queue_msg.append("\nNo songs in queue")
+
+        await ctx.send("\n".join(queue_msg))
 
     @commands.command(name='lyrics')
     async def lyrics(self, ctx):
@@ -483,12 +507,6 @@ class MusicCog(commands.Cog):
             await ctx.send(f"Volume set to {volume}%")
         except Exception as e:
             await ctx.send(f"❌ An error occurred while setting volume: {str(e)}")
-        self.volume = volume / 100  # Convert to float between 0 and 1
-        
-        if ctx.voice_client.source:
-            ctx.voice_client.source.volume = self.volume
-            
-        await ctx.send(f"Volume set to {volume}%")
 
     @commands.command(name='loop')
     async def loop(self, ctx, mode: str = None):
@@ -505,19 +523,3 @@ class MusicCog(commands.Cog):
             return await ctx.send("Invalid loop mode. Use: off, track, or queue")
             
         await ctx.send(f"Loop mode set to: {self.loop_mode}")
-        if not self.current_player and not self.song_queue:
-            await ctx.send("The queue is empty")
-            return
-
-        queue_msg = []
-        if self.current_player:
-            queue_msg.append(f"Currently playing: {self.current_player.title}")
-        
-        if self.song_queue:
-            queue_msg.append("\nUp next:")
-            for i, (player, _) in enumerate(self.song_queue, 1):
-                queue_msg.append(f"{i}. {player.title}")
-        else:
-            queue_msg.append("\nNo songs in queue")
-
-        await ctx.send("\n".join(queue_msg))
