@@ -5,6 +5,7 @@ import lyricsgenius
 import json
 import pickle
 from pathlib import Path
+from queue_manager import QueueManager, QueuedSong
 from discord.ext import commands
 from spotipy.oauth2 import SpotifyClientCredentials
 import youtube_dl
