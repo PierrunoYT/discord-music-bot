@@ -71,8 +71,8 @@ class MusicCog(commands.Cog):
             raise Exception(f"Error processing Spotify link: {str(e)}")
 
     @commands.command(name='play')
-    async def play(self, ctx, *, url):
-        """Plays audio from YouTube or Spotify"""
+    async def play(self, ctx, *, query):
+        """Plays audio from YouTube/Spotify URL or searches YouTube for the query"""
         if not ctx.message.author.voice:
             await ctx.send("You need to be in a voice channel to use this command!")
             return
@@ -83,12 +83,23 @@ class MusicCog(commands.Cog):
         
         async with ctx.typing():
             try:
-                # Convert Spotify URL to YouTube URL if necessary
-                if 'spotify.com/track' in url:
-                    url = await self.get_spotify_track_url(url)
+                # Handle different input types
+                if 'spotify.com/track' in query:
+                    query = await self.get_spotify_track_url(query)
+                elif not ('youtube.com' in query or 'youtu.be' in query):
+                    # Treat as search query
+                    search_query = f"ytsearch:{query}"
+                    data = await self.bot.loop.run_in_executor(
+                        None, 
+                        lambda: ytdl.extract_info(search_query, download=False)
+                    )
+                    if not data.get('entries'):
+                        await ctx.send("No results found.")
+                        return
+                    query = data['entries'][0]['webpage_url']
                 
                 # Get the player
-                player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
+                player = await YTDLSource.from_url(query, loop=self.bot.loop, stream=True)
                 
                 # If something is playing, add to queue
                 if ctx.voice_client.is_playing():
