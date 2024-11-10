@@ -58,5 +58,22 @@ async def on_ready():
     print(f'{bot.user} is ready!')
     await bot.add_cog(MusicCog(bot))
 
+@bot.event
+async def on_command_error(ctx, error):
+    """Global error handler"""
+    if isinstance(error, commands.CommandNotFound):
+        await ctx.send("❌ Command not found. Use !help to see available commands.")
+    elif isinstance(error, commands.MissingPermissions):
+        await ctx.send("❌ You don't have permission to use this command.")
+    elif isinstance(error, commands.BotMissingPermissions):
+        await ctx.send("❌ I don't have the required permissions to perform this action.")
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send(f"❌ Missing required argument: {error.param.name}")
+    elif isinstance(error, commands.BadArgument):
+        await ctx.send("❌ Invalid argument provided.")
+    else:
+        await ctx.send(f"❌ An error occurred: {str(error)}")
+        print(f"Unhandled error: {error}")
+
 # Run the bot
 bot.run(os.getenv('DISCORD_TOKEN'))

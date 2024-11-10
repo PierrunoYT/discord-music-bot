@@ -143,9 +143,16 @@ class MusicCog(commands.Cog):
     @commands.command(name='play')
     async def play(self, ctx, *, query):
         """Plays audio from YouTube/Spotify URL or searches YouTube for the query"""
-        if not ctx.message.author.voice:
-            await ctx.send("You need to be in a voice channel to use this command!")
-            return
+        try:
+            if not ctx.message.author.voice:
+                await ctx.send("❌ You need to be in a voice channel to use this command!")
+                return
+
+            # Check bot permissions
+            permissions = ctx.message.author.voice.channel.permissions_for(ctx.guild.me)
+            if not permissions.connect or not permissions.speak:
+                await ctx.send("❌ I don't have permission to join or speak in that voice channel!")
+                return
 
         # Auto-connect to the user's voice channel
         if ctx.voice_client is None:
@@ -187,7 +194,18 @@ class MusicCog(commands.Cog):
                     await ctx.send(f'Now playing: {player.title}')
                 
             except Exception as e:
-                await ctx.send(f'An error occurred: {str(e)}')
+                error_msg = "❌ An error occurred: "
+                if "Video unavailable" in str(e):
+                    error_msg += "The video is unavailable or region-locked."
+                elif "not available in your country" in str(e):
+                    error_msg += "This content is not available in your region."
+                elif "sign in to confirm your age" in str(e):
+                    error_msg += "Age-restricted content cannot be played."
+                elif "Private video" in str(e):
+                    error_msg += "This video is private."
+                else:
+                    error_msg += str(e)
+                await ctx.send(error_msg)
 
     @commands.command(name='stop')
     async def stop(self, ctx):
@@ -346,11 +364,16 @@ class MusicCog(commands.Cog):
     @commands.command(name='volume')
     async def volume(self, ctx, volume: int):
         """Change the player volume (0-100)"""
-        if not ctx.voice_client:
-            return await ctx.send("Not connected to a voice channel.")
-            
-        if not 0 <= volume <= 100:
-            return await ctx.send("Volume must be between 0 and 100")
+        try:
+            if not ctx.voice_client:
+                return await ctx.send("❌ Not connected to a voice channel.")
+                
+            if not 0 <= volume <= 100:
+                return await ctx.send("❌ Volume must be between 0 and 100")
+                
+            # Check if user is in the same voice channel
+            if not ctx.author.voice or ctx.author.voice.channel != ctx.voice_client.channel:
+                return await ctx.send("❌ You must be in the same voice channel to change the volume.")
             
         self.volume = volume / 100  # Convert to float between 0 and 1
         
