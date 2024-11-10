@@ -18,11 +18,18 @@ ytdl_format_options = {
     'quiet': True,
     'no_warnings': True,
     'default_search': 'auto',
-    'source_address': '0.0.0.0'
+    'source_address': '0.0.0.0',
+    # Optimize for audio quality
+    'preferredcodec': 'opus',
+    'preferredquality': '192',
+    # Enable fast start
+    'buffersize': 32768,
+    'audio_buffer_size': 50000
 }
 
 ffmpeg_options = {
-    'options': '-vn'
+    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+    'options': '-vn -af "volume=0.5" -loglevel error -bufsize 32k -maxrate 160k'
 }
 
 ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
