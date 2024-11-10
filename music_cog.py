@@ -1,6 +1,7 @@
 import asyncio
 import discord
 import spotipy
+import lyricsgenius
 from discord.ext import commands
 from spotipy.oauth2 import SpotifyClientCredentials
 import youtube_dl
@@ -58,6 +59,7 @@ class MusicCog(commands.Cog):
         self.volume = 0.5  # Default volume (50%)
         self.loop_mode = "off"  # off, track, queue
         self.current_ctx = None  # Store context for looping
+        self.genius = lyricsgenius.Genius(os.getenv('GENIUS_ACCESS_TOKEN'))
 
     async def get_spotify_track_url(self, spotify_url):
         """Convert Spotify URL to YouTube search query"""
@@ -186,6 +188,49 @@ class MusicCog(commands.Cog):
     @commands.command(name='queue')
     async def queue(self, ctx):
         """Display the current song queue"""
+
+    @commands.command(name='lyrics')
+    async def lyrics(self, ctx):
+        """Display lyrics for the currently playing song"""
+        if not self.current_player:
+            await ctx.send("No song is currently playing!")
+            return
+
+        async with ctx.typing():
+            try:
+                # Extract artist and title from the video title
+                title = self.current_player.title
+                # Remove common YouTube suffixes
+                title = title.replace("(Official Video)", "").replace("(Official Audio)", "")
+                title = title.replace("[Official Video]", "").replace("[Official Audio]", "")
+                title = title.strip()
+
+                # Try to split artist and song name if they're separated by a dash
+                if " - " in title:
+                    artist, song = title.split(" - ", 1)
+                else:
+                    # If no dash, search with full title
+                    artist = ""
+                    song = title
+
+                # Search for the song
+                song = self.genius.search_song(song, artist)
+                
+                if song:
+                    # Split lyrics into chunks if they're too long
+                    lyrics = song.lyrics
+                    chunks = [lyrics[i:i+2000] for i in range(0, len(lyrics), 2000)]
+                    
+                    # Send the first message with song info
+                    await ctx.send(f"📜 Lyrics for: {song.title} by {song.artist}")
+                    
+                    # Send lyrics in chunks
+                    for chunk in chunks:
+                        await ctx.send(f"```{chunk}```")
+                else:
+                    await ctx.send("Couldn't find lyrics for this song.")
+            except Exception as e:
+                await ctx.send(f"An error occurred while fetching lyrics: {str(e)}")
         
     @commands.command(name='volume')
     async def volume(self, ctx, volume: int):

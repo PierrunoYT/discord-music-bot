@@ -48,6 +48,7 @@ cp .env.example .env
 - `!queue` - Display the current queue
 - `!volume <0-100>` - Adjust the playback volume
 - `!loop [mode]` - Set loop mode (off/track/queue). No argument cycles through modes
+- `!lyrics` - Display lyrics for the currently playing song
 
 ## Setting Up Development Environment
 
