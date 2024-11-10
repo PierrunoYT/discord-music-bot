@@ -39,6 +39,12 @@ class YTDLSource(discord.PCMVolumeTransformer):
         self.data = data
         self.title = data.get('title')
         self.url = data.get('url')
+        self.duration = data.get('duration')
+        # Try to extract artist from title (Artist - Title format)
+        self.artist = data.get('artist') or (
+            data.get('title').split(' - ')[0] if ' - ' in data.get('title', '') 
+            else 'Unknown Artist'
+        )
 
     @classmethod
     async def from_url(cls, url, *, loop=None, stream=False):
@@ -206,6 +212,27 @@ class MusicCog(commands.Cog):
         if ctx.voice_client and not ctx.voice_client.is_playing():
             await ctx.voice_client.disconnect()
             await ctx.send("Disconnected due to inactivity")
+
+    @commands.command(name='nowplaying', aliases=['np'])
+    async def nowplaying(self, ctx):
+        """Display information about the current track"""
+        if not self.current_player:
+            await ctx.send("No song is currently playing!")
+            return
+
+        # Format duration
+        duration = self.current_player.duration
+        minutes = duration // 60
+        seconds = duration % 60
+        duration_str = f"{minutes}:{seconds:02d}"
+
+        embed = discord.Embed(title="Now Playing", color=discord.Color.blue())
+        embed.add_field(name="Title", value=self.current_player.title, inline=False)
+        embed.add_field(name="Artist", value=self.current_player.artist, inline=True)
+        embed.add_field(name="Duration", value=duration_str, inline=True)
+        embed.add_field(name="URL", value=self.current_player.url, inline=False)
+
+        await ctx.send(embed=embed)
 
     @commands.command(name='queue')
     async def queue(self, ctx):
