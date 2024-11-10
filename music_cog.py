@@ -160,38 +160,38 @@ class MusicCog(commands.Cog):
             elif ctx.voice_client.channel != ctx.message.author.voice.channel:
                 await ctx.voice_client.move_to(ctx.message.author.voice.channel)
 
-            async with ctx.typing():
-                # Handle different input types
-                if 'spotify.com/track' in query:
-                    query = await self.get_spotify_track_url(query)
-                elif not ('youtube.com' in query or 'youtu.be' in query):
-                    # Treat as search query
-                    search_query = f"ytsearch:{query}"
-                    data = await self.bot.loop.run_in_executor(
-                        None, 
-                        lambda: ytdl.extract_info(search_query, download=False)
-                    )
-                    if not data.get('entries'):
-                        await ctx.send("No results found.")
-                        return
-                    query = data['entries'][0]['webpage_url']
-                
-                # Get the player
-                player = await YTDLSource.from_url(query, loop=self.bot.loop, stream=True)
-                
-                # If something is playing, add to queue
-                if ctx.voice_client.is_playing():
-                    self.song_queue.append((player, ctx))
-                    self._save_queue_state()
-                    await ctx.send(f'Added to queue: {player.title}')
-                else:
-                    # Play the track immediately
-                    player.volume = self.volume
-                    ctx.voice_client.play(player, after=lambda e: self.play_next(ctx))
-                    self.current_player = player
-                    self.current_ctx = ctx
-                    await ctx.send(f'Now playing: {player.title}')
-                
+            try:
+                async with ctx.typing():
+                    # Handle different input types
+                    if 'spotify.com/track' in query:
+                        query = await self.get_spotify_track_url(query)
+                    elif not ('youtube.com' in query or 'youtu.be' in query):
+                        # Treat as search query
+                        search_query = f"ytsearch:{query}"
+                        data = await self.bot.loop.run_in_executor(
+                            None, 
+                            lambda: ytdl.extract_info(search_query, download=False)
+                        )
+                        if not data.get('entries'):
+                            await ctx.send("No results found.")
+                            return
+                        query = data['entries'][0]['webpage_url']
+                    
+                    # Get the player
+                    player = await YTDLSource.from_url(query, loop=self.bot.loop, stream=True)
+                    
+                    # If something is playing, add to queue
+                    if ctx.voice_client.is_playing():
+                        self.song_queue.append((player, ctx))
+                        self._save_queue_state()
+                        await ctx.send(f'Added to queue: {player.title}')
+                    else:
+                        # Play the track immediately
+                        player.volume = self.volume
+                        ctx.voice_client.play(player, after=lambda e: self.play_next(ctx))
+                        self.current_player = player
+                        self.current_ctx = ctx
+                        await ctx.send(f'Now playing: {player.title}')
             except Exception as e:
                 error_msg = "❌ An error occurred: "
                 if "Video unavailable" in str(e):
