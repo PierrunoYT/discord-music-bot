@@ -1,13 +1,15 @@
 # Discord Music Bot
 
-A Discord bot that can play music from YouTube and Spotify in voice channels.
+A Discord bot that can play music from YouTube and Spotify in voice channels, with lyrics support via Genius.
 
 ## Features
 
 - Play music from YouTube (URLs or search queries)
-- Play music from Spotify (track links)
+- Play music from Spotify (track links and playlists)
+- Display song lyrics using Genius API
 - Basic playback controls (pause, resume, stop)
 - Voice channel management (join, leave)
+- Queue management and loop modes
 
 ## Prerequisites
 
@@ -15,6 +17,7 @@ A Discord bot that can play music from YouTube and Spotify in voice channels.
 - FFmpeg installed on your system
 - Discord Bot Token
 - Spotify Developer credentials
+- Genius API Token
 
 ## Installation
 
@@ -45,7 +48,7 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-5. Edit the `.env` file with your Discord bot token and Spotify credentials
+5. Edit the `.env` file with your Discord bot token, Spotify credentials, and Genius token
 
 ## Commands
 
@@ -60,12 +63,14 @@ cp .env.example .env
 - `!volume <0-100>` - Adjust the playback volume
 - `!loop [mode]` - Set loop mode (off/track/queue). No argument cycles through modes
 - `!lyrics` - Display lyrics for the currently playing song
+- `!nowplaying` - Show details about the current song
 
 ## Setting Up Development Environment
 
 1. Create a Discord Application and Bot at [Discord Developer Portal](https://discord.com/developers/applications)
 2. Create a Spotify Application at [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
-3. Install FFmpeg:
+3. Create a Genius Application at [Genius Developer Portal](https://genius.com/api-clients)
+4. Install FFmpeg:
    - Windows: Download from [FFmpeg website](https://ffmpeg.org/download.html)
    - Linux: `sudo apt-get install ffmpeg`
    - macOS: `brew install ffmpeg`
@@ -76,6 +81,28 @@ Create a `.env` file with the following variables:
 - `DISCORD_TOKEN`: Your Discord bot token
 - `SPOTIFY_CLIENT_ID`: Your Spotify client ID
 - `SPOTIFY_CLIENT_SECRET`: Your Spotify client secret
+- `GENIUS_ACCESS_TOKEN`: Your Genius API access token
+
+## Features in Detail
+
+### Music Playback
+- Support for YouTube videos, playlists, and search queries
+- Support for Spotify tracks and playlists
+- Automatic queue management
+- Volume control
+- Multiple loop modes (single track, queue, or off)
+
+### Lyrics Integration
+- Automatic lyrics fetching using Genius API
+- Smart song title parsing for better lyrics matching
+- Support for songs with or without explicit artist information
+
+### Queue Management
+- Add songs to queue while playing
+- View current queue
+- Skip tracks
+- Clear queue with stop command
+- Persistent queue across bot restarts
 
 ## Contributing
 
