@@ -154,11 +154,11 @@ class MusicCog(commands.Cog):
                 await ctx.send("❌ I don't have permission to join or speak in that voice channel!")
                 return
 
-        # Auto-connect to the user's voice channel
-        if ctx.voice_client is None:
-            await ctx.message.author.voice.channel.connect()
-        elif ctx.voice_client.channel != ctx.message.author.voice.channel:
-            await ctx.voice_client.move_to(ctx.message.author.voice.channel)
+            # Auto-connect to the user's voice channel
+            if ctx.voice_client is None:
+                await ctx.message.author.voice.channel.connect()
+            elif ctx.voice_client.channel != ctx.message.author.voice.channel:
+                await ctx.voice_client.move_to(ctx.message.author.voice.channel)
 
         async with ctx.typing():
             try:
@@ -374,7 +374,15 @@ class MusicCog(commands.Cog):
             # Check if user is in the same voice channel
             if not ctx.author.voice or ctx.author.voice.channel != ctx.voice_client.channel:
                 return await ctx.send("❌ You must be in the same voice channel to change the volume.")
+                
+            self.volume = volume / 100  # Convert to float between 0 and 1
             
+            if ctx.voice_client.source:
+                ctx.voice_client.source.volume = self.volume
+                
+            await ctx.send(f"Volume set to {volume}%")
+        except Exception as e:
+            await ctx.send(f"❌ An error occurred while setting volume: {str(e)}")
         self.volume = volume / 100  # Convert to float between 0 and 1
         
         if ctx.voice_client.source:
