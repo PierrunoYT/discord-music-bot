@@ -81,10 +81,12 @@ class MusicCog(commands.Cog):
             await ctx.send("You need to be in a voice channel to use this command!")
             return
 
-        # Connect to voice channel if not already connected
-        if not ctx.voice_client:
+        # Auto-connect to the user's voice channel
+        if ctx.voice_client is None:
             await ctx.message.author.voice.channel.connect()
-        
+        elif ctx.voice_client.channel != ctx.message.author.voice.channel:
+            await ctx.voice_client.move_to(ctx.message.author.voice.channel)
+
         async with ctx.typing():
             try:
                 # Handle different input types
@@ -125,6 +127,8 @@ class MusicCog(commands.Cog):
         """Stops playback and disconnects the bot"""
         if ctx.voice_client:
             self.song_queue.clear()  # Clear the queue
+            self.current_player = None
+            self.current_ctx = None
             ctx.voice_client.stop()
             await ctx.voice_client.disconnect()
             await ctx.send("Stopped playing, cleared queue, and disconnected")
@@ -151,6 +155,9 @@ class MusicCog(commands.Cog):
 
     def play_next(self, ctx):
         """Play the next song in the queue"""
+        if not ctx.voice_client:
+            return
+            
         if self.loop_mode == "track" and self.current_player:
             # Replay the current track
             player = self.current_player
@@ -175,6 +182,14 @@ class MusicCog(commands.Cog):
             # If queue loop is enabled, add the song back to the end
             if self.loop_mode == "queue":
                 self.song_queue.append((self.current_player, self.current_ctx))
+        else:
+            # No more songs in queue, disconnect after a delay
+            self.current_player = None
+            self.current_ctx = None
+            asyncio.run_coroutine_threadsafe(
+                self._disconnect_after_delay(ctx), 
+                self.bot.loop
+            )
 
     @commands.command(name='skip')
     async def skip(self, ctx):
@@ -184,6 +199,13 @@ class MusicCog(commands.Cog):
             await ctx.send("Skipped the current song")
         else:
             await ctx.send("Nothing is playing right now")
+
+    async def _disconnect_after_delay(self, ctx):
+        """Disconnect from voice after a delay if nothing is playing"""
+        await asyncio.sleep(180)  # 3 minutes delay
+        if ctx.voice_client and not ctx.voice_client.is_playing():
+            await ctx.voice_client.disconnect()
+            await ctx.send("Disconnected due to inactivity")
 
     @commands.command(name='queue')
     async def queue(self, ctx):
