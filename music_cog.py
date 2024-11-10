@@ -2,6 +2,9 @@ import asyncio
 import discord
 import spotipy
 import lyricsgenius
+import json
+import pickle
+from pathlib import Path
 from discord.ext import commands
 from spotipy.oauth2 import SpotifyClientCredentials
 import youtube_dl
@@ -73,6 +76,55 @@ class MusicCog(commands.Cog):
         self.loop_mode = "off"  # off, track, queue
         self.current_ctx = None  # Store context for looping
         self.genius = lyricsgenius.Genius(os.getenv('GENIUS_ACCESS_TOKEN'))
+        self.queue_manager = QueueManager()
+        self._load_saved_queue()
+
+    def _load_saved_queue(self):
+        """Load saved queue state"""
+        current_song, queue = self.queue_manager.load_queue()
+        if current_song:
+            self.bot.loop.create_task(self._restore_current_song(current_song))
+        for song in queue:
+            self.bot.loop.create_task(self._restore_queued_song(song))
+
+    async def _restore_current_song(self, song):
+        """Restore the current song from saved state"""
+        try:
+            player = await YTDLSource.from_url(song.url, loop=self.bot.loop, stream=True)
+            self.current_player = player
+        except Exception as e:
+            print(f"Error restoring current song: {e}")
+
+    async def _restore_queued_song(self, song):
+        """Restore a queued song from saved state"""
+        try:
+            player = await YTDLSource.from_url(song.url, loop=self.bot.loop, stream=True)
+            self.song_queue.append((player, None))
+        except Exception as e:
+            print(f"Error restoring queued song: {e}")
+
+    def _save_queue_state(self):
+        """Save current queue state"""
+        current_song = None
+        if self.current_player:
+            current_song = QueuedSong(
+                title=self.current_player.title,
+                url=self.current_player.url,
+                duration=self.current_player.duration,
+                artist=self.current_player.artist
+            )
+        
+        queue = [
+            QueuedSong(
+                title=player.title,
+                url=player.url,
+                duration=player.duration,
+                artist=player.artist
+            )
+            for player, _ in self.song_queue
+        ]
+        
+        self.queue_manager.save_queue(current_song, queue)
 
     async def get_spotify_track_url(self, spotify_url):
         """Convert Spotify URL to YouTube search query"""
@@ -123,6 +175,7 @@ class MusicCog(commands.Cog):
                 # If something is playing, add to queue
                 if ctx.voice_client.is_playing():
                     self.song_queue.append((player, ctx))
+                    self._save_queue_state()
                     await ctx.send(f'Added to queue: {player.title}')
                 else:
                     # Play the track immediately
@@ -187,6 +240,7 @@ class MusicCog(commands.Cog):
             next_ctx.voice_client.play(next_player, after=lambda e: self.play_next(next_ctx))
             self.current_player = next_player
             self.current_ctx = next_ctx
+            self._save_queue_state()
             asyncio.run_coroutine_threadsafe(
                 next_ctx.send(f'Now playing: {next_player.title}'),
                 self.bot.loop
