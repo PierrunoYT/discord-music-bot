@@ -160,8 +160,7 @@ class MusicCog(commands.Cog):
             elif ctx.voice_client.channel != ctx.message.author.voice.channel:
                 await ctx.voice_client.move_to(ctx.message.author.voice.channel)
 
-        async with ctx.typing():
-            try:
+            async with ctx.typing():
                 # Handle different input types
                 if 'spotify.com/track' in query:
                     query = await self.get_spotify_track_url(query)
@@ -206,6 +205,8 @@ class MusicCog(commands.Cog):
                 else:
                     error_msg += str(e)
                 await ctx.send(error_msg)
+        except Exception as e:
+            await ctx.send(f"❌ An error occurred while connecting: {str(e)}")
 
     @commands.command(name='stop')
     async def stop(self, ctx):
