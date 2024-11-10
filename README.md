@@ -46,6 +46,7 @@ cp .env.example .env
 - `!stop` - Stop playback and clear the queue
 - `!skip` - Skip to the next song in queue
 - `!queue` - Display the current queue
+- `!volume <0-100>` - Adjust the playback volume
 
 ## Setting Up Development Environment
 

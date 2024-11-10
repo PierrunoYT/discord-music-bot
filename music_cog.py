@@ -55,6 +55,7 @@ class MusicCog(commands.Cog):
         self.bot = bot
         self.current_player = None
         self.song_queue = []
+        self.volume = 0.5  # Default volume (50%)
 
     async def get_spotify_track_url(self, spotify_url):
         """Convert Spotify URL to YouTube search query"""
@@ -95,6 +96,7 @@ class MusicCog(commands.Cog):
                     await ctx.send(f'Added to queue: {player.title}')
                 else:
                     # Play the track immediately
+                    player.volume = self.volume
                     ctx.voice_client.play(player, after=lambda e: self.play_next(ctx))
                     self.current_player = player
                     await ctx.send(f'Now playing: {player.title}')
@@ -135,6 +137,7 @@ class MusicCog(commands.Cog):
         """Play the next song in the queue"""
         if self.song_queue:
             next_player, next_ctx = self.song_queue.pop(0)
+            next_player.volume = self.volume
             next_ctx.voice_client.play(next_player, after=lambda e: self.play_next(next_ctx))
             self.current_player = next_player
             asyncio.run_coroutine_threadsafe(
@@ -154,6 +157,22 @@ class MusicCog(commands.Cog):
     @commands.command(name='queue')
     async def queue(self, ctx):
         """Display the current song queue"""
+        
+    @commands.command(name='volume')
+    async def volume(self, ctx, volume: int):
+        """Change the player volume (0-100)"""
+        if not ctx.voice_client:
+            return await ctx.send("Not connected to a voice channel.")
+            
+        if not 0 <= volume <= 100:
+            return await ctx.send("Volume must be between 0 and 100")
+            
+        self.volume = volume / 100  # Convert to float between 0 and 1
+        
+        if ctx.voice_client.source:
+            ctx.voice_client.source.volume = self.volume
+            
+        await ctx.send(f"Volume set to {volume}%")
         if not self.current_player and not self.song_queue:
             await ctx.send("The queue is empty")
             return
