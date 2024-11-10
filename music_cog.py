@@ -15,7 +15,7 @@ import os
 ytdl_format_options = {
     'format': 'bestaudio/best',
     'restrictfilenames': True,
-    'noplaylist': True,
+    'noplaylist': False,
     'nocheckcertificate': True,
     'ignoreerrors': False,
     'logtostderr': False,
@@ -127,6 +127,64 @@ class MusicCog(commands.Cog):
         
         self.queue_manager.save_queue(current_song, queue)
 
+    async def process_playlist(self, ctx, playlist_data):
+        """Process and queue all songs from a playlist"""
+        entries = playlist_data.get('entries', [])
+        if not entries:
+            await ctx.send("No playable items found in playlist")
+            return
+
+        # Add first song to play immediately if nothing is playing
+        first_entry = entries[0]
+        first_player = await YTDLSource.from_url(first_entry['webpage_url'], loop=self.bot.loop, stream=True)
+        
+        if ctx.voice_client.is_playing():
+            self.song_queue.append((first_player, ctx))
+            await ctx.send(f'Added to queue: {first_player.title}')
+        else:
+            first_player.volume = self.volume
+            ctx.voice_client.play(first_player, after=lambda e: self.play_next(ctx))
+            self.current_player = first_player
+            self.current_ctx = ctx
+            await ctx.send(f'Now playing: {first_player.title}')
+
+        # Queue remaining songs
+        for entry in entries[1:]:
+            try:
+                player = await YTDLSource.from_url(entry['webpage_url'], loop=self.bot.loop, stream=True)
+                self.song_queue.append((player, ctx))
+            except Exception as e:
+                print(f"Error processing playlist item: {e}")
+                continue
+
+        await ctx.send(f'Added {len(entries)} songs from playlist to queue')
+        self._save_queue_state()
+
+    async def get_spotify_playlist_tracks(self, playlist_url):
+        """Get all tracks from a Spotify playlist"""
+        try:
+            if 'playlist' in playlist_url:
+                playlist_id = playlist_url.split('/')[-1].split('?')[0]
+                results = spotify.playlist_tracks(playlist_id)
+                tracks = results['items']
+                
+                # Handle pagination
+                while results['next']:
+                    results = spotify.next(results)
+                    tracks.extend(results['items'])
+
+                search_queries = []
+                for item in tracks:
+                    track = item['track']
+                    if track:  # Some tracks might be None due to availability
+                        artist = track['artists'][0]['name']
+                        name = track['name']
+                        search_queries.append(f"{artist} - {name}")
+                return search_queries
+            return []
+        except Exception as e:
+            raise Exception(f"Error processing Spotify playlist: {str(e)}")
+
     async def get_spotify_track_url(self, spotify_url):
         """Convert Spotify URL to YouTube search query"""
         try:
@@ -163,8 +221,49 @@ class MusicCog(commands.Cog):
             try:
                 async with ctx.typing():
                     # Handle different input types
-                    if 'spotify.com/track' in query:
-                        query = await self.get_spotify_track_url(query)
+                    if 'spotify.com' in query:
+                        if 'playlist' in query:
+                            # Handle Spotify playlist
+                            search_queries = await self.get_spotify_playlist_tracks(query)
+                            await ctx.send(f"Processing Spotify playlist with {len(search_queries)} tracks...")
+                            
+                            for i, search_query in enumerate(search_queries):
+                                try:
+                                    data = await self.bot.loop.run_in_executor(
+                                        None,
+                                        lambda: ytdl.extract_info(f"ytsearch:{search_query}", download=False)
+                                    )
+                                    if data.get('entries'):
+                                        player = await YTDLSource.from_url(
+                                            data['entries'][0]['webpage_url'],
+                                            loop=self.bot.loop,
+                                            stream=True
+                                        )
+                                        if i == 0 and not ctx.voice_client.is_playing():
+                                            player.volume = self.volume
+                                            ctx.voice_client.play(player, after=lambda e: self.play_next(ctx))
+                                            self.current_player = player
+                                            self.current_ctx = ctx
+                                            await ctx.send(f'Now playing: {player.title}')
+                                        else:
+                                            self.song_queue.append((player, ctx))
+                                except Exception as e:
+                                    print(f"Error processing track {i+1}: {e}")
+                                    continue
+                            
+                            self._save_queue_state()
+                            return
+                        else:
+                            # Handle single Spotify track
+                            query = await self.get_spotify_track_url(query)
+                    elif 'youtube.com/playlist' in query or 'youtu.be/playlist' in query:
+                        # Handle YouTube playlist
+                        data = await self.bot.loop.run_in_executor(
+                            None,
+                            lambda: ytdl.extract_info(query, download=False)
+                        )
+                        await self.process_playlist(ctx, data)
+                        return
                     elif not ('youtube.com' in query or 'youtu.be' in query):
                         # Treat as search query
                         search_query = f"ytsearch:{query}"
@@ -177,7 +276,7 @@ class MusicCog(commands.Cog):
                             return
                         query = data['entries'][0]['webpage_url']
                     
-                    # Get the player
+                    # Get the player for single track
                     player = await YTDLSource.from_url(query, loop=self.bot.loop, stream=True)
                     
                     # If something is playing, add to queue
