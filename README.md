@@ -24,17 +24,28 @@ git clone <your-repository-url>
 cd discord-music-bot
 ```
 
-2. Install the required packages:
+2. Create and activate a virtual environment:
+```bash
+# Windows
+python -m venv venv
+venv\Scripts\activate
+
+# Linux/macOS
+python3 -m venv venv
+source venv/bin/activate
+```
+
+3. Install the required packages:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Copy `.env.example` to `.env` and fill in your tokens:
+4. Copy `.env.example` to `.env` and fill in your tokens:
 ```bash
 cp .env.example .env
 ```
 
-4. Edit the `.env` file with your Discord bot token and Spotify credentials
+5. Edit the `.env` file with your Discord bot token and Spotify credentials
 
 ## Commands
 
