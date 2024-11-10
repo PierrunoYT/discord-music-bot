@@ -54,6 +54,7 @@ class MusicCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.current_player = None
+        self.song_queue = []
 
     async def get_spotify_track_url(self, spotify_url):
         """Convert Spotify URL to YouTube search query"""
@@ -88,14 +89,15 @@ class MusicCog(commands.Cog):
                 # Get the player
                 player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
                 
-                # Stop current playback if any
+                # If something is playing, add to queue
                 if ctx.voice_client.is_playing():
-                    ctx.voice_client.stop()
-                
-                # Play the new track
-                ctx.voice_client.play(player)
-                self.current_player = player
-                await ctx.send(f'Now playing: {player.title}')
+                    self.song_queue.append((player, ctx))
+                    await ctx.send(f'Added to queue: {player.title}')
+                else:
+                    # Play the track immediately
+                    ctx.voice_client.play(player, after=lambda e: self.play_next(ctx))
+                    self.current_player = player
+                    await ctx.send(f'Now playing: {player.title}')
                 
             except Exception as e:
                 await ctx.send(f'An error occurred: {str(e)}')
@@ -104,9 +106,10 @@ class MusicCog(commands.Cog):
     async def stop(self, ctx):
         """Stops playback and disconnects the bot"""
         if ctx.voice_client:
+            self.song_queue.clear()  # Clear the queue
             ctx.voice_client.stop()
             await ctx.voice_client.disconnect()
-            await ctx.send("Stopped playing and disconnected")
+            await ctx.send("Stopped playing, cleared queue, and disconnected")
         else:
             await ctx.send("I'm not connected to a voice channel")
 
@@ -127,3 +130,43 @@ class MusicCog(commands.Cog):
             await ctx.send("Playback resumed")
         else:
             await ctx.send("Nothing is paused right now")
+
+    def play_next(self, ctx):
+        """Play the next song in the queue"""
+        if self.song_queue:
+            next_player, next_ctx = self.song_queue.pop(0)
+            next_ctx.voice_client.play(next_player, after=lambda e: self.play_next(next_ctx))
+            self.current_player = next_player
+            asyncio.run_coroutine_threadsafe(
+                next_ctx.send(f'Now playing: {next_player.title}'),
+                self.bot.loop
+            )
+
+    @commands.command(name='skip')
+    async def skip(self, ctx):
+        """Skip the current song"""
+        if ctx.voice_client and (ctx.voice_client.is_playing() or ctx.voice_client.is_paused()):
+            ctx.voice_client.stop()  # This will trigger play_next via the after callback
+            await ctx.send("Skipped the current song")
+        else:
+            await ctx.send("Nothing is playing right now")
+
+    @commands.command(name='queue')
+    async def queue(self, ctx):
+        """Display the current song queue"""
+        if not self.current_player and not self.song_queue:
+            await ctx.send("The queue is empty")
+            return
+
+        queue_msg = []
+        if self.current_player:
+            queue_msg.append(f"Currently playing: {self.current_player.title}")
+        
+        if self.song_queue:
+            queue_msg.append("\nUp next:")
+            for i, (player, _) in enumerate(self.song_queue, 1):
+                queue_msg.append(f"{i}. {player.title}")
+        else:
+            queue_msg.append("\nNo songs in queue")
+
+        await ctx.send("\n".join(queue_msg))

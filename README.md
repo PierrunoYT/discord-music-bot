@@ -40,10 +40,12 @@ cp .env.example .env
 
 - `!join` - Bot joins your current voice channel
 - `!leave` - Bot leaves the voice channel
-- `!play <query>` - Play a song (YouTube URL, search query, or Spotify track link)
+- `!play <query>` - Play a song or add it to queue (YouTube URL, search query, or Spotify track link)
 - `!pause` - Pause the current song
 - `!resume` - Resume playback
 - `!stop` - Stop playback and clear the queue
+- `!skip` - Skip to the next song in queue
+- `!queue` - Display the current queue
 
 ## Setting Up Development Environment
 
