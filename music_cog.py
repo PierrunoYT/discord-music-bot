@@ -109,3 +109,21 @@ class MusicCog(commands.Cog):
             await ctx.send("Stopped playing and disconnected")
         else:
             await ctx.send("I'm not connected to a voice channel")
+
+    @commands.command(name='pause')
+    async def pause(self, ctx):
+        """Pauses the currently playing audio"""
+        if ctx.voice_client and ctx.voice_client.is_playing():
+            ctx.voice_client.pause()
+            await ctx.send("Playback paused")
+        else:
+            await ctx.send("Nothing is playing right now")
+
+    @commands.command(name='resume')
+    async def resume(self, ctx):
+        """Resumes the currently paused audio"""
+        if ctx.voice_client and ctx.voice_client.is_paused():
+            ctx.voice_client.resume()
+            await ctx.send("Playback resumed")
+        else:
+            await ctx.send("Nothing is paused right now")
